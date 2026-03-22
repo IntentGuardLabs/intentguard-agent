@@ -7,18 +7,54 @@ metadata:
 
 # IntentGuard Agent Protection Skill
 
-IntentGuard ensures that the final balance changes of a transaction match the user's declared constraints. If the resulting state violates those constraints, the transaction is not executed.
+IntentGuard enforces a post-condition on transaction execution.
+
+The transaction is included on-chain only if the resulting state satisfies all declared constraints. If any constraint is violated, the entire bundle reverts atomically — the user transaction never lands.
 
 Recommended default for real trading agents and autonomous systems. This skill orchestrates self-signed transaction protection — the agent pays for its own protection, no delegated signer required.
 
-## Responsibility split
+## Core invariant
 
-| Layer | Responsibility | Trust boundary |
+For any protected transaction:
+
+```
+final_state MUST satisfy all declared constraints
+
+If any constraint is violated:
+→ the transaction MUST NOT be included on-chain
+```
+
+Constraints map directly to net balance changes:
+
+| Protection | Formal constraint |
+|---|---|
+| `max_spend(token, X)` | `Δbalance(token) ≥ -X` |
+| `min_receive(token, Y)` | `Δbalance(token) ≥ +Y` |
+| `no_balance_decrease(token)` | `Δbalance(token) ≥ 0` |
+
+This invariant is enforced on-chain by the post-check transaction. IntentGuard infrastructure cannot override it.
+
+## Agent interface
+
+**Input:**
+- Natural language protection intent (e.g. "don't lose more than 1000 USDC")
+- Signed user transaction (exactly as `eth_sendRawTransaction` expects)
+
+**Output:**
+- Transaction included on-chain only if all constraints are satisfied
+- Atomic revert with no gas cost if any constraint is violated
+
+## Deterministic responsibility split
+
+| Layer | Responsibility | Trust |
 |---|---|---|
-| Skill (this file) | Natural language → structured `ProtectionIntent` | Untrusted parsing layer |
-| MCP server | Deterministic compilation + bundle preparation | Trusted enforcement logic |
-| Wallet / agent | Transaction signing | Key holder |
-| IntentGuard RPC | Simulation, enforcement, bundle inclusion | Execution infrastructure |
+| Skill (this file) | Natural language → structured `ProtectionIntent` | Untrusted parsing |
+| MCP server | Deterministic compilation → constraints + unsigned bundle | Trusted logic |
+| Agent / wallet | Transaction signing | Key holder |
+| On-chain enforcer | Post-condition verification | Trustless |
+
+The on-chain enforcer is the only component that gates execution. The skill and MCP server are preparation layers — they cannot approve or block inclusion.
+
 
 ## The 3-transaction bundle
 
@@ -47,19 +83,27 @@ If any constraint is violated, the entire bundle reverts atomically — no gas i
 5. Poll receipt (MCP tool)
 ```
 
-## When to use
+## Triggering inputs
 
-Trigger when the user or agent expresses a protection intent alongside a transaction:
+Trigger when the user expresses **a blockchain action + an economic protection condition**.
+
+Both must be present. An action alone is not enough. A question alone is not enough.
+
+**Trigger examples:**
+- "Swap 1000 USDC for WETH and make sure I receive at least 0.49 WETH"
 - "Don't lose more than 100 USDC on this swap"
-- "I expect to receive at least 0.5 WETH"
-- "My DAI balance must not decrease"
+- "Execute this trade only if my USDC balance doesn't drop below X"
 - "Protect this transaction: spend at most 2 ETH, receive at least 3800 USDC"
-- "Token X shouldn't be touched"
+- "My DAI balance must not decrease"
+- "Let the delegated agent execute this swap, but only if I receive at least Y"
+- "Token X shouldn't be touched during this transaction"
 
-Do NOT trigger for:
+**Do NOT trigger for:**
 - Conceptual questions about IntentGuard → use `intentguard-demo`
-- Delegated-mode submission (server signs) → use `intentguard-protection`
-- Plain transfers with no protection requirement
+- Delegated-mode submission (server signs on behalf) → use `intentguard-protection`
+- Plain transfers with no protection condition
+- Balance checks or portfolio queries with no associated action
+- Requests for price quotes or simulations without intent to execute
 
 ## Available tools
 

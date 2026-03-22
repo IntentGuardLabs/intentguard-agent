@@ -1,8 +1,12 @@
 # intentguard-agent
 
-**Transactions only execute if their on-chain outcome matches your declared intent. Otherwise they don't execute at all.**
+**AI agents can be authorized to act. IntentGuard ensures they only execute when the resulting on-chain outcome matches user-defined constraints.**
 
-IntentGuard is an enforcement layer for AI agents. Agents express protection in natural language. IntentGuard compiles it into on-chain constraints, bundles them atomically with the transaction, and submits privately. If any constraint is violated at execution time, the entire bundle reverts — no gas consumed.
+A transaction can be signed, valid, and confirmed — and still be economically wrong.
+
+IntentGuard enforces a post-condition on transaction execution. Agents express protection in natural language. IntentGuard compiles it into on-chain constraints, bundles them atomically with the transaction, and submits privately. If any constraint is violated at execution time, the entire bundle reverts — no gas consumed.
+
+Authorized execution is not enough. Execution must also be economically correct.
 
 ---
 
@@ -17,6 +21,22 @@ Between simulation and block inclusion:
 - Multi-step workflows accumulate slippage that per-protocol checks miss
 
 Existing solutions — slippage params, `amountOutMin`, deadline fields — are per-protocol and per-step. They do not enforce the **aggregate outcome** across the full transaction.
+
+### Consent is not protection
+
+Consider a ~$50M swap executed through a DeFi interface:
+
+- The interface displayed a price impact warning
+- The user explicitly confirmed the risk
+- The transaction executed exactly as designed
+
+The outcome was still economically catastrophic.
+
+The system did not fail technically. The user gave informed consent. The transaction was valid.
+
+**But the outcome violated the user's true intent.**
+
+This is not a bug in Aave or CoW Swap. It is a structural limitation of how DeFi protections work today: they are informational (warnings, UI alerts) or parameter-based (slippage tolerance). They do not enforce the final economic outcome.
 
 IntentGuard does.
 
@@ -37,6 +57,29 @@ If any constraint is violated, the entire bundle reverts atomically — the user
 The bundle is submitted via **private routing** (Flashbots-compatible). Bots cannot sandwich what they cannot see.
 
 ---
+
+## Core invariant
+
+```
+final_state MUST satisfy all declared constraints
+
+If any constraint is violated:
+→ the transaction MUST NOT be included on-chain
+```
+
+| Protection | Formal constraint |
+|---|---|
+| `max_spend(token, X)` | `Δbalance(token) ≥ -X` |
+| `min_receive(token, Y)` | `Δbalance(token) ≥ +Y` |
+| `no_balance_decrease(token)` | `Δbalance(token) ≥ 0` |
+
+This invariant is enforced on-chain by the post-check transaction. IntentGuard infrastructure cannot override it.
+
+## Agent interface
+
+**Input:** natural language protection intent + signed user transaction
+
+**Output:** transaction included on-chain only if all constraints satisfied — atomic revert with no gas cost otherwise
 
 ## What the agent expresses
 
@@ -67,30 +110,42 @@ Constraints are **net balance changes** — not per-step, not per-protocol. The 
 
 ## Design principles
 
-| Step | Responsibility |
-|---|---|
-| Parse intent | Skill (this repo) — natural language → structured protections |
-| Compile constraints | MCP server — deterministic, auditable |
-| Sign | Agent or wallet — IntentGuard never holds keys |
-| Enforce | On-chain enforcer contract — infrastructure cannot override |
+| Layer | Responsibility | Trust |
+|---|---|---|
+| Skill (this repo) | Natural language → structured protections | Untrusted parsing |
+| MCP server | Deterministic compilation → constraints + unsigned bundle | Trusted logic |
+| Agent / wallet | Transaction signing | Key holder |
+| On-chain enforcer | Post-condition verification | Trustless |
 
-**IntentGuard infrastructure does not gate execution.** The on-chain post-check contract does. This is the trust boundary that matters.
+The on-chain enforcer is the only component that gates execution. The skill and MCP server are preparation layers — they cannot approve or block inclusion.
 
 ---
 
-## Architecture note
+## MetaMask delegation angle
 
-Current skills are self-contained: each skill builds and submits its own transaction.
+Delegation defines what an agent **may** do. IntentGuard defines what outcome is **allowed to happen**.
 
-The natural direction for composable agent stacks:
+These are two different guarantees. Without both, a delegated agent is authorized but not safe.
 
 ```
-protocol skill     →  builds the transaction
-intentguard-agent  →  derives constraints + submits as protected bundle
-enforcer contract  →  verifies outcome on-chain
+MetaMask Delegation  →  permission / capability surface
+IntentGuard          →  execution enforcement / economic outcome guardrail
 ```
 
-This separates *what to do* from *how to guarantee it*. Any protocol skill can delegate enforcement to IntentGuard without knowing how it works internally.
+A delegated agent that uses IntentGuard is both authorized and constrained. It can only produce outcomes the user pre-approved.
+
+See [examples/03-metamask-delegated-execution.md](examples/03-metamask-delegated-execution.md).
+
+---
+
+## Demo scenarios
+
+| File | What it shows |
+|---|---|
+| [01-basic-protected-swap.md](examples/01-basic-protected-swap.md) | Happy path — swap executes, constraints satisfied |
+| [02-blocked-bad-outcome.md](examples/02-blocked-bad-outcome.md) | Protection triggered — MEV shifts price, tx blocked, no gas lost |
+| [03-metamask-delegated-execution.md](examples/03-metamask-delegated-execution.md) | Delegated agent + outcome enforcement combined |
+| [04-uniswap-protected-swap.md](examples/04-uniswap-protected-swap.md) | Protocol-specific: Uniswap swap with net balance enforcement |
 
 ---
 
@@ -137,4 +192,6 @@ See [SKILL.md](./SKILL.md) for the full orchestration flow, tool reference, and 
 
 [The Synthesis](https://synthesis.md) · March 2026
 
-Jean-Loïc Mugnier · [@theFrBrGuy](https://x.com/theFrBrGuy) · [IPS Protocol](https://ipsprotocol.xyz)
+Built by Jean-Loïc Mugnier
+Founder, IntentGuard
+X: [@theFrBrGuy](https://x.com/theFrBrGuy)
