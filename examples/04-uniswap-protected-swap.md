@@ -64,7 +64,7 @@ Route: determined by Uniswap — IntentGuard enforces outcome, not path
 
 **Agent (step 3 — assign nonce, sign all three, submit):**
 
-Assigns nonce N+1 to the Uniswap `actionTx`. Signs `preTx`, `actionTx`, and `postTx`. Calls `submit_protected_bundle` with `signedPreTx`, `signedUserTx`, `signedPostTx`.
+Assigns nonce N+1 to the Uniswap `userTx`. Signs `preTx`, `userTx`, and `postTx`. Calls `submit_protected_bundle` with `signedPreTx`, `signedUserTx`, `signedPostTx`.
 
 ---
 

@@ -44,7 +44,7 @@ Response:
 **Agent to user:**
 > Protection triggered at block 19500002.
 > Would have received 0.41 WETH — below your minimum of 0.49.
-> Transaction was not submitted. No gas consumed.
+> Bundle not included on-chain. No gas paid.
 >
 > Retrying in next block...
 
@@ -74,7 +74,7 @@ submit_protected_bundle({ ..., retryUntilBlock: 19500007 })
 |---|---|---|---|
 | WETH inflow | ≥ 0.49 | 0.41 | ✗ violated |
 
-Bundle reverted atomically. User transaction never landed. Zero gas consumed.
+Bundle not included on-chain. User transaction never executed. No gas paid.
 
 ---
 

@@ -54,7 +54,7 @@ Response:
 
 **Agent (step 3 — assign nonce + sign all three):**
 
-Assigns nonce 43 to the upstream Uniswap `actionTx`. Signs `preTx`, `actionTx`, and `postTx` — all with the same key (`userAddress`).
+Assigns nonce 43 to the upstream Uniswap `userTx`. Signs `preTx`, `userTx`, and `postTx` — all with the same key (`userAddress`).
 
 **Agent (step 4 — submit bundle):**
 

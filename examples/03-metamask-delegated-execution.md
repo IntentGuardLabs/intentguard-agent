@@ -30,7 +30,11 @@ These are two different questions. Delegation without outcome enforcement means 
 >
 > Delegation authorizes the action. IntentGuard constrains the result.
 >
-> Preparing protected bundle now...
+> Confirm to proceed with protected execution.
+
+**User:** Confirmed.
+
+**Agent:** Preparing protected bundle...
 
 **Agent (step 1 — parse intent):**
 
@@ -63,7 +67,7 @@ Outcome enforcement: IntentGuard post-check (trustless)
 
 **Agent (step 3 — assign nonce, sign all three, submit):**
 
-Assigns nonce N+1 to the `actionTx`. Signs `preTx`, `actionTx`, and `postTx`. Calls `submit_protected_bundle` with `signedPreTx`, `signedUserTx`, `signedPostTx`.
+Assigns nonce N+1 to the `userTx`. Signs `preTx`, `userTx`, and `postTx`. Calls `submit_protected_bundle` with `signedPreTx`, `signedUserTx`, `signedPostTx`.
 
 ---
 

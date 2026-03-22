@@ -29,7 +29,7 @@ protections:
 
 **Expected tool path:**
 ```
-prepare_protected_transaction → [sign preTx, actionTx, postTx] → submit_protected_bundle
+prepare_protected_transaction → [sign preTx, userTx, postTx] → submit_protected_bundle
 ```
 
 **Why this triggers:** The user specifies both an action and an enforceable outcome condition.
@@ -50,10 +50,12 @@ protections:
 
 **Expected tool path:**
 ```
-prepare_protected_transaction → [sign preTx, actionTx, postTx] → submit_protected_bundle
+prepare_protected_transaction → [sign preTx, userTx, postTx] → submit_protected_bundle
 ```
 
 **Why this triggers:** The user provides a transaction and an explicit asset-protection condition.
+
+**Note:** DAI token address must be confirmed before proceeding — see Example C.
 
 ---
 
@@ -236,7 +238,7 @@ Signed transactions from an aborted flow must be treated as invalid and discarde
 
 ### Example G — Nonce design constraint and collision recovery
 
-**Design constraint:** The IntentGuard 3-transaction bundle requires three consecutive nonces: N (preTx), N+1 (actionTx), N+2 (postTx). The MCP fetches nonce N at `prepare_protected_transaction` time and returns `nonceLayout: { pre: N, action: N+1, post: N+2 }`.
+**Design constraint:** The IntentGuard 3-transaction bundle requires three consecutive nonces: N (preTx), N+1 (userTx), N+2 (postTx). The MCP fetches nonce N at `prepare_protected_transaction` time and returns `nonceLayout: { pre: N, action: N+1, post: N+2 }`.
 
 The upstream protocol skill or orchestrator that builds the unsigned `actionTx` MUST NOT pre-set a nonce. The IntentGuard agent assigns `nonceLayout.action` (N+1) to the `actionTx` after `prepare_protected_transaction` returns.
 
@@ -259,6 +261,6 @@ Suggested agent response:
 >
 > I'll re-prepare the bundle with fresh nonces now.
 
-Then: re-call `prepare_protected_transaction` with the same `userAddress` and `protectionIntent`. Assign the new `nonceLayout.action` to the `actionTx`. Sign the new bundle and submit.
+Then: re-call `prepare_protected_transaction` with the same `userAddress` and `protectionIntent`. Assign the new `nonceLayout.action` to the `userTx`. Sign the new bundle and submit.
 
 **Why:** The nonce layout (N, N+1, N+2) must match the current on-chain state. Re-preparation is the only valid recovery — the previous bundle cannot be patched.
