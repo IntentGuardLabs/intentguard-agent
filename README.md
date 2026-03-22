@@ -1,12 +1,15 @@
 # intentguard-agent
 
-**AI agents can be authorized to act. IntentGuard ensures they only execute when the resulting on-chain outcome matches user-defined constraints.**
+**IntentGuard protects intent by translating it into explicit constraints that users can verify and the chain can enforce.**
 
 A transaction can be signed, valid, and confirmed — and still be economically wrong.
 
-IntentGuard enforces a post-condition on transaction execution. Agents express protection in natural language. IntentGuard compiles it into on-chain constraints, bundles them atomically with the transaction, and submits privately. If any constraint is violated at execution time, the entire bundle reverts — no gas consumed.
+IntentGuard turns user intent into enforceable on-chain constraints. Users express protection in natural language. The agent translates it into explicit balance constraints, presents them for user verification, and only then prepares protected execution. If any constraint is violated, the bundle is not included on-chain — the user transaction never executes, and no gas is paid.
 
-Authorized execution is not enough. Execution must also be economically correct.
+```
+User intent  →  explicit constraints  →  enforced at execution
+If constraints not satisfied  →  transaction not included  →  no gas paid
+```
 
 ---
 
@@ -44,17 +47,50 @@ IntentGuard does.
 
 ## How it works
 
-Every protected transaction becomes a 3-transaction bundle:
+IntentGuard does not build the underlying DeFi action. It takes an unsigned action transaction produced elsewhere (by a protocol skill or orchestrator), wraps it in a protection envelope, and returns the full 3-transaction signing package.
+
+See [e2e_flow.md](e2e_flow.md) for the complete sequence diagram.
+
+Every protected transaction becomes a bundle:
 
 ```
-pre-check  (nonce N)    →  snapshots token balances before execution
-user tx    (nonce N+1)  →  the original transaction, unmodified
-post-check (nonce N+2)  →  verifies outcome constraints after execution
+preTx      (nonce N)    →  snapshots token balances before execution
+actionTx   (nonce N+1)  →  the action transaction, unmodified
+postTx     (nonce N+2)  →  verifies outcome constraints after execution
 ```
 
-If any constraint is violated, the entire bundle reverts atomically — the user tx never lands.
+The agent signs all three and submits atomically. If any constraint is violated, the bundle is not included on-chain — the action transaction never executes, and no gas is paid.
+
+Failed outcomes are filtered before block inclusion, not after execution. Builders evaluate the bundle atomically — if the post-check would fail, the entire bundle is dropped. That's why the user pays no gas.
 
 The bundle is submitted via **private routing** (Flashbots-compatible). Bots cannot sandwich what they cannot see.
+
+---
+
+## Intent to constraint translation
+
+IntentGuard does not require users to write raw balance constraints directly.
+
+Users express protection in natural language:
+
+```
+"Don't lose more than 1000 USDC"
+"Receive at least 0.49 WETH"
+"My DAI balance must not decrease"
+```
+
+The agent translates that into explicit, machine-checkable constraints and **presents them to the user for verification** before preparing protected execution:
+
+```
+I translated your intent into these enforceable protections:
+
+  max spend:    1000 USDC  →  ΔUSDC ≥ -1000
+  min receive:  0.49 WETH  →  ΔWETH ≥ +0.49
+
+Please confirm before I prepare the protected transaction.
+```
+
+Only after confirmation does the agent proceed. The user sees exactly what will be enforced.
 
 ---
 
@@ -79,7 +115,7 @@ This invariant is enforced on-chain by the post-check transaction. IntentGuard i
 
 **Input:** natural language protection intent + signed user transaction
 
-**Output:** transaction included on-chain only if all constraints satisfied — atomic revert with no gas cost otherwise
+**Output:** transaction included on-chain only if all constraints satisfied — bundle dropped before inclusion otherwise, no gas paid
 
 ## What the agent expresses
 
@@ -104,7 +140,7 @@ Constraints are **net balance changes** — not per-step, not per-protocol. The 
 
 **Success:** WETH received ≥ 0.49, USDC spent ≤ 1000 → bundle lands, trade executes.
 
-**Blocked:** MEV bot extracts value, WETH received = 0.41 → post-check fails, bundle reverts atomically, user loses nothing.
+**Blocked:** MEV bot extracts value, WETH received = 0.41 → post-check fails, bundle is not included, user transaction never executes, no gas paid.
 
 ---
 
@@ -118,6 +154,29 @@ Constraints are **net balance changes** — not per-step, not per-protocol. The 
 | On-chain enforcer | Post-condition verification | Trustless |
 
 The on-chain enforcer is the only component that gates execution. The skill and MCP server are preparation layers — they cannot approve or block inclusion.
+
+---
+
+## Why this matters for AI-managed capital
+
+Autonomous agents can construct, sign, and submit transactions — but they cannot guarantee that the resulting economic outcome matches the user's intent.
+
+This creates a fundamental gap:
+
+- Agents can be authorized to act
+- But there is no native guarantee that execution outcomes are acceptable
+
+IntentGuard closes this gap. It provides an execution enforcement layer where agents translate user intent into explicit constraints, users verify them, and execution only occurs if the final on-chain outcome satisfies them.
+
+This makes IntentGuard a foundational primitive for:
+- AI trading agents
+- delegated portfolio management
+- autonomous execution systems
+- on-chain financial automation
+
+IntentGuard is not just a safety layer — it is an execution primitive for AI-managed capital.
+
+Without outcome enforcement, agentic execution is authorized — but not safe.
 
 ---
 
@@ -142,10 +201,14 @@ See [examples/03-metamask-delegated-execution.md](examples/03-metamask-delegated
 
 | File | What it shows |
 |---|---|
+| [00-trigger-conversations.md](examples/00-trigger-conversations.md) | Routing contract — when to trigger, when not to, ambiguous cases |
 | [01-basic-protected-swap.md](examples/01-basic-protected-swap.md) | Happy path — swap executes, constraints satisfied |
-| [02-blocked-bad-outcome.md](examples/02-blocked-bad-outcome.md) | Protection triggered — MEV shifts price, tx blocked, no gas lost |
+| [02-blocked-bad-outcome.md](examples/02-blocked-bad-outcome.md) | Protection triggered — MEV shifts price, tx blocked, no gas paid |
 | [03-metamask-delegated-execution.md](examples/03-metamask-delegated-execution.md) | Delegated agent + outcome enforcement combined |
 | [04-uniswap-protected-swap.md](examples/04-uniswap-protected-swap.md) | Protocol-specific: Uniswap swap with net balance enforcement |
+| [05-blocked-token-drain.md](examples/05-blocked-token-drain.md) | Non-swap: protected assets must not move, regardless of calldata |
+
+IntentGuard is not limited to swaps. The same enforcement primitive prevents unauthorized asset movement — whether from MEV, unexpected contract behavior, or malicious calldata — by enforcing that protected balances must not decrease.
 
 ---
 
