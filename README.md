@@ -115,7 +115,7 @@ This invariant is enforced on-chain by the post-check transaction. IntentGuard i
 
 ## Agent interface
 
-**Input:** natural language protection intent + signed user transaction
+**Input:** natural language protection intent + `userAddress`; the protected user transaction is built upstream by the orchestrator or protocol skill and is not passed to this skill directly
 
 **Output:** transaction included on-chain only if all constraints satisfied — bundle dropped before inclusion otherwise, no gas paid
 
@@ -221,7 +221,7 @@ Trading agent  →  x402 payment  →  IntentGuard service  →  protected bundl
 
 The agent is both the caller and the economic actor. There is no human in the payment loop.
 
-IntentGuard can be deployed as an agent service on Base, where agents can discover, invoke, and pay for protection before executing transactions.
+IntentGuard is aligned with the Base agent-service model and is intended for deployment on Base, where agents can discover, invoke, and pay for protection before executing transactions. Current deployment is on Sepolia testnet.
 
 **Agent consumer types:**
 - **Trading agents** — autonomous systems executing swaps with outcome guarantees
@@ -247,7 +247,7 @@ See [examples/06-agent-pays-for-protection.md](examples/06-agent-pays-for-protec
 
 ## Why this fits Base — Agent Services on Base
 
-IntentGuard is an outcome enforcement service designed to be consumed by agents, not humans.
+IntentGuard is an outcome enforcement service designed to be consumed by agents, not humans. It is currently live on Sepolia testnet and intended for deployment on Base.
 
 | Property | Detail |
 |---|---|
@@ -292,9 +292,7 @@ For delegated signing (server signs on your behalf), see `intentguard-protection
 
 ### Load the skill
 
-```
-"Load the skill at https://raw.githubusercontent.com/IntentGuardLabs/intentguard-agent/main/SKILL.md"
-```
+Link or copy [SKILL.md](./SKILL.md) into your Claude Code `.claude/skills/intentguard-agent/` directory.
 
 ### Example prompts
 
@@ -314,6 +312,7 @@ See [SKILL.md](./SKILL.md) for the full orchestration flow, tool reference, and 
 - EIP-1559 (type 2) transactions only — Ethereum mainnet + Sepolia
 - Token approval side effects persist on revert (expected EVM behavior)
 - Token symbol → address resolution is the agent's responsibility
+- Failed bundles are not queryable as raw on-chain transactions after they are dropped. If constraints are violated and the bundle is not included, there is no on-chain transaction artifact to inspect later.
 
 ---
 

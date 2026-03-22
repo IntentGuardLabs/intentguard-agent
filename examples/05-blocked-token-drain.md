@@ -21,21 +21,23 @@ This means even if the transaction is malicious, misleading, or simply unexpecte
 **User:**
 > Execute this transaction, but my USDC and DAI balances must not decrease.
 
-**Agent:**
-> Understood. I'll enforce these outcome constraints:
->
-> - USDC balance must not decrease
-> - DAI balance must not decrease
->
-> If the transaction would cause either balance to drop, it will not be included on-chain.
->
-> Preparing protected bundle...
-
 **Agent (step 1 — parse intent):**
 
 Parsed protections:
 - `no_balance_decrease(USDC)` → ΔUSDC ≥ 0
 - `no_balance_decrease(DAI)` → ΔDAI ≥ 0
+
+**Agent (confirmation prompt):**
+> I translated your intent into these enforceable protections:
+>
+>   no balance decrease: USDC  →  ΔUSDC ≥ 0
+>   no balance decrease: DAI   →  ΔDAI ≥ 0
+>
+> If the transaction would cause either balance to drop, it will not be included on-chain.
+>
+> Confirm to proceed with protected execution.
+
+**User:** Confirmed.
 
 **Agent (step 2–4 — prepare and sign bundle):**
 

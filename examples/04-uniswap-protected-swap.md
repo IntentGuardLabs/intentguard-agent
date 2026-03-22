@@ -19,18 +19,23 @@ The difference is not about replacing Uniswap's protection. It is about where en
 **User:**
 > Swap 10 ETH to USDC on Uniswap. Only execute if I receive at least 24,500 USDC.
 
-**Agent:**
-> Understood. I'll enforce a minimum receive of 24,500 USDC on the final balance outcome.
->
-> This constraint applies to your account's net USDC change — regardless of the swap route or intermediary hops.
->
-> Preparing protected bundle...
-
 **Agent (step 1 — parse intent):**
 
 Parsed protections:
 - `max_spend(ETH, 10)` → ΔnativeBalance ≥ -10 ETH
 - `min_receive(USDC, 24500)` → ΔUSDC ≥ +24500
+
+**Agent (confirmation prompt):**
+> I translated your intent into these enforceable protections:
+>
+>   max spend:    10 ETH    →  ΔnativeBalance ≥ -10
+>   min receive:  24,500 USDC  →  ΔUSDC ≥ +24500
+>
+> This constraint applies to your account's net balance change — regardless of the swap route or intermediary hops.
+>
+> Confirm to proceed with protected execution.
+
+**User:** Confirmed.
 
 **Agent (step 2 — prepare full bundle):**
 

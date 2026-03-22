@@ -17,48 +17,36 @@ Parses `min_receive(WETH, 0.49)`, calls `prepare_protected_transaction`, receive
 
 **Agent (step 4 — submit bundle):**
 
+The agent calls `submit_protected_bundle` once with `retryUntilBlock`. The MCP server retries internally across blocks until the bundle is included or the block window expires. The agent does not resubmit.
+
 ```
 submit_protected_bundle({
   signedPreTx:  "0x02f8...",
   signedUserTx: "0x02f8...",   // signed actionTx
-  signedPostTx: "0x02f8..."
+  signedPostTx: "0x02f8...",
+  retryUntilBlock: 19500007
 })
 ```
 
-Response:
+The MCP polls across blocks 19500002–19500007. Market conditions do not recover — the post-check would fail on each attempt. After the block window expires, the MCP returns the final status:
+
 ```json
 {
   "status": "protected",
-  "error": "PROTECTED",
+  "error": "RETRY_EXHAUSTED",
   "violatedConstraints": [
     {
       "token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
       "required": { "minInflow": "0.49" },
       "actual":   { "inflow": "0.41" }
     }
-  ],
-  "retriesRemaining": 4
+  ]
 }
 ```
 
 **Agent to user:**
-> Protection triggered at block 19500002.
-> Would have received 0.41 WETH — below your minimum of 0.49.
-> Bundle not included on-chain. No gas paid.
->
-> Retrying in next block...
-
-**Agent (retry — block 19500003):**
-
-Resubmits the same signed bundle.
-
-```
-submit_protected_bundle({ ..., retryUntilBlock: 19500007 })
-→ { "status": "protected", "error": "PROTECTED", "retriesRemaining": 3 }
-```
-
-**Agent to user (after RETRY_EXHAUSTED at block 19500007):**
 > All retry attempts exhausted. Market conditions did not meet your constraints within the validity window.
+> Would have received 0.41 WETH — below your minimum of 0.49.
 > No transaction was submitted. No gas was consumed.
 >
 > Options:

@@ -21,26 +21,24 @@ These are two different questions. Delegation without outcome enforcement means 
 **User:**
 > I've delegated swap permissions to my trading agent. Have it swap up to 1000 USDC for WETH — but don't let the swap go through unless I receive at least 0.49 WETH.
 
-**Agent:**
+**Agent (step 1 — parse intent):**
+
+Parsed protections:
+- `max_spend(USDC, 1000)` → ΔUSDC ≥ -1000
+- `min_receive(WETH, 0.49)` → ΔWETH ≥ +0.49
+
+**Agent (confirmation prompt):**
 > Your delegated permissions authorize me to perform the swap.
-> I'm layering IntentGuard outcome enforcement so execution only proceeds if:
+> I translated your intent into these enforceable protections:
 >
-> - USDC spent ≤ 1000
-> - WETH received ≥ 0.49
+>   max spend:    1000 USDC  →  ΔUSDC ≥ -1000
+>   min receive:  0.49 WETH  →  ΔWETH ≥ +0.49
 >
 > Delegation authorizes the action. IntentGuard constrains the result.
 >
 > Confirm to proceed with protected execution.
 
 **User:** Confirmed.
-
-**Agent:** Preparing protected bundle...
-
-**Agent (step 1 — parse intent):**
-
-Parsed protections:
-- `max_spend(USDC, 1000)` → ΔUSDC ≥ -1000
-- `min_receive(WETH, 0.49)` → ΔWETH ≥ +0.49
 
 **Agent (step 2 — prepare full bundle):**
 
