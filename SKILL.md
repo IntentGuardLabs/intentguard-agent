@@ -39,7 +39,8 @@ This invariant is enforced on-chain by the post-check transaction. IntentGuard i
 **Input:**
 - Natural language protection intent (e.g. "don't lose more than 1000 USDC")
 - `userAddress` — the account whose balances are being protected
-- `actionTx` — the unsigned action transaction to protect (produced by a protocol skill or the agent — built outside the MCP)
+
+The `actionTx` is **not** an input to this skill. It is built by an upstream protocol skill or orchestrator and never passed to IntentGuard.
 
 **Output:**
 - `summary` — human-readable description of the enforced protections
@@ -116,6 +117,13 @@ Both must be present. An action alone is not enough. A question alone is not eno
 - "My DAI and USDC balances must not decrease"
 - "Prepare a protected swap: send this calldata but only if the outcome satisfies these constraints"
 
+**Agent-to-agent trigger examples (no human in the loop):**
+- Orchestrator sends: `{ "action": "protect_and_submit", "actionTx": "0x...", "protections": [{ "type": "min_receive", "token": {...}, "amount": "24500" }] }`
+- Trading agent sends: `{ "intent": "execute_swap", "constraints": { "maxSpend": { "USDC": "1000" }, "minReceive": { "WETH": "0.49" } } }`
+- Pipeline sends: `{ "userAddress": "0xAgent...", "unsignedTx": "...", "protectionPolicy": "no_balance_decrease(DAI)" }`
+
+In agent-to-agent mode, skip the human confirmation step — the calling agent is the confirming principal. Present the parsed constraints in the response so the orchestrator can log them.
+
 **Do NOT trigger when:**
 - The user is asking for explanation or a conceptual question → use `intentguard-demo`
 - The user wants delegated-mode submission where the server signs → use `intentguard-protection`
@@ -140,7 +148,7 @@ See [examples/00-trigger-conversations.md](examples/00-trigger-conversations.md)
 
 | Tool | Purpose |
 |---|---|
-| `prepare_protected_transaction` | Compile protection intent + unsigned actionTx → full 3-tx unsigned bundle |
+| `prepare_protected_transaction` | Compile protection intent → unsigned `preTx` + `postTx` + `nonceLayout` |
 | `submit_protected_bundle` | Submit 3 signed txs (preTx + actionTx + postTx) as a self-signed bundle |
 
 `get_block_number`, `get_nonce`, and decimal resolution are handled internally by the MCP server. The agent does not need to call them.
@@ -265,7 +273,7 @@ Amounts are human-readable (e.g. "1000" for 1000 USDC, "0.95" for 0.95 WETH). De
 
 See [e2e_flow.md](e2e_flow.md) for the full sequence diagram.
 
-**Prerequisite:** The unsigned `actionTx` must be produced before invoking this skill — by a protocol skill, an orchestrator agent, or the user supplying raw calldata. IntentGuard does not build the underlying DeFi action.
+**Prerequisite:** This skill only needs `userAddress`, `protectionIntent`, and optionally `validUntilBlock` to call `prepare_protected_transaction`. The `actionTx` is an upstream concern — built by a protocol skill or orchestrator before the full bundle is assembled. The agent does NOT ask the user for `actionTx`.
 
 **Nonce window constraint:** Between `prepare_protected_transaction` and `submit_protected_bundle`, no other transaction from `userAddress` should be submitted. The MCP assigns nonces at prepare time. If another transaction from the same address is included on-chain during this window, the bundle nonces become invalid and `NONCE_COLLISION` is returned — requiring a full re-preparation.
 
@@ -369,6 +377,7 @@ User: "Swap 1000 USDC for WETH on mainnet. Don't lose more than 1000 USDC and I 
 - No transaction semantic validation — the compiler does not inspect what the transaction does, only what balance changes to enforce
 - Token resolution is the agent's responsibility — the MCP server does not resolve symbols
 - EIP-1559 (type 2) transactions only
+- **Raw bundle transactions must not be queryable after failure.** If a bundle is dropped (constraints violated, never included on-chain), the raw `preTx`, `actionTx`, and `postTx` must not be retrievable via any API. Exposing them leaks the user's trade calldata, protection thresholds, and nonce layout — even though protection worked as intended. The MCP server must not persist or serve bundle transaction data after a failed or expired submission.
 
 ## Agent integration checklist
 
@@ -378,6 +387,33 @@ User: "Swap 1000 USDC for WETH on mainnet. Don't lose more than 1000 USDC and I 
 4. Assign `nonceLayout.action` (N+1) to the upstream `actionTx`
 5. Sign `preTx`, `actionTx`, `postTx` — all with the same key
 6. Submit via `submit_protected_bundle(signedPreTx, signedUserTx, signedPostTx)` → returns inclusion status
+
+## IntentGuard as an Agent Service
+
+IntentGuard is designed to be consumed by agents as a protection service, not by humans through a UI.
+
+**Service model:**
+
+```
+Trading agent  →  x402 payment  →  IntentGuard MCP  →  protected bundle  →  on-chain enforcer
+```
+
+An orchestrator or trading agent calls `prepare_protected_transaction` and `submit_protected_bundle` as service calls. The agent is both the caller and the economic actor. The human principal set the constraints at delegation time — they do not need to confirm each transaction.
+
+**Billing (intended, not yet in v1):** Each protected bundle call is a billable service interaction. The agent pays via [x402](https://x402.org) before the MCP responds with the prepared bundle. If payment is not received, the service returns `402 Payment Required` and the bundle is not prepared. This makes protection cost explicit: the agent pays per execution guarantee, not per outcome.
+
+**What changes in agent-to-agent mode:**
+
+| Property | Human-facing mode | Agent service mode |
+|---|---|---|
+| Confirmation | User confirms constraints in chat | Calling agent is the confirming principal — skip interactive prompt |
+| Payment gate | Not present in v1 | x402 payment check before prepare (intended) |
+| Error handling | Explain to user, offer options | Return structured error for orchestrator to handle |
+| Constraint source | Natural language parsed in real time | Structured `ProtectionIntent` passed directly |
+
+**Trust model:** The on-chain enforcer is the root of trust. Neither the skill, the MCP server, nor the calling agent can override it. An agent that provides a malformed protection intent gets constraints compiled from what it sent — garbage in, garbage enforced.
+
+---
 
 ## Critical rules
 

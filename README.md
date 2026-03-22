@@ -11,6 +11,8 @@ User intent  →  explicit constraints  →  enforced at execution
 If constraints not satisfied  →  transaction not included  →  no gas paid
 ```
 
+IntentGuard sits between intent creation and transaction submission. Not a wallet. Not a protocol. Not a UI. An execution enforcement layer that any agent can call.
+
 ---
 
 ## The problem
@@ -180,20 +182,83 @@ Without outcome enforcement, agentic execution is authorized — but not safe.
 
 ---
 
-## MetaMask delegation angle
+## MetaMask
 
-Delegation defines what an agent **may** do. IntentGuard defines what outcome is **allowed to happen**.
+MetaMask defines what an agent is allowed to do.
 
-These are two different guarantees. Without both, a delegated agent is authorized but not safe.
+IntentGuard defines what outcome is allowed to happen.
 
-```
-MetaMask Delegation  →  permission / capability surface
-IntentGuard          →  execution enforcement / economic outcome guardrail
-```
-
-A delegated agent that uses IntentGuard is both authorized and constrained. It can only produce outcomes the user pre-approved.
+This allows safe delegated execution — agents can act, but only within enforced economic constraints.
 
 See [examples/03-metamask-delegated-execution.md](examples/03-metamask-delegated-execution.md).
+
+---
+
+## Uniswap
+
+IntentGuard is protocol-agnostic and works on top of Uniswap swaps.
+
+While Uniswap enforces execution parameters (e.g. `amountOutMin`), IntentGuard enforces the final balance outcome.
+
+This protects against:
+- MEV
+- multi-hop slippage
+- unexpected price movements
+
+See [examples/04-uniswap-protected-swap.md](examples/04-uniswap-protected-swap.md).
+
+---
+
+## Agent Service Model
+
+Any agent that moves money can pay IntentGuard before execution to ensure the outcome is correct.
+
+IntentGuard is exposed as a callable service endpoint (e.g. MCP or RPC) that agents invoke before execution. Before submitting a transaction, an agent calls IntentGuard to obtain protected execution guarantees and pays for that service via an agent-native payment mechanism such as [x402](https://x402.org).
+
+```
+Trading agent  →  x402 payment  →  IntentGuard service  →  protected bundle
+```
+
+The agent is both the caller and the economic actor. There is no human in the payment loop.
+
+IntentGuard can be deployed as an agent service on Base, where agents can discover, invoke, and pay for protection before executing transactions.
+
+**Agent consumer types:**
+- **Trading agents** — autonomous systems executing swaps with outcome guarantees
+- **Portfolio managers** — agents enforcing position constraints across multi-step workflows
+- **Execution pipelines** — orchestrators that route actions through IntentGuard as a protection layer
+
+**Why agents pay for outcome enforcement:**
+
+Agents can be trusted to construct valid transactions. They cannot be trusted to guarantee acceptable outcomes — that requires an independent enforcement layer with on-chain finality.
+
+IntentGuard is that layer. Agents pay for certainty: the transaction executes only if the outcome is acceptable. If it is not, nothing happens and no gas is consumed.
+
+**Pricing model (intended):**
+- Per protected transaction fee — pay only when you submit
+- Subscription tier for high-frequency agents
+- Pricing is usage-based and aligns with transaction risk and frequency
+
+x402 is the intended billing interface. It is not yet implemented in v1 — protection is currently provided without a payment gate.
+
+See [examples/06-agent-pays-for-protection.md](examples/06-agent-pays-for-protection.md).
+
+---
+
+## Why this fits Base — Agent Services on Base
+
+IntentGuard is an outcome enforcement service designed to be consumed by agents, not humans.
+
+| Property | Detail |
+|---|---|
+| Agent-native interface | MCP tools, structured JSON protections, no human UX required |
+| Service model | Agents pay for execution guarantees — per-transaction billing via x402 |
+| Protocol-agnostic | Works on any EVM contract — Uniswap, Aave, CoW, custom calldata |
+| On-chain enforcement | Post-condition verified trustlessly on Base — no centralized gate |
+| MEV protection | Private relay routing — bots cannot sandwich what they cannot see |
+| No gas on bad outcomes | Bundle dropped before inclusion — agent pays only for successful execution |
+
+IntentGuard fills a gap in the agentic execution stack: authorization (MetaMask Delegation) tells agents what they may do; IntentGuard tells the chain what outcomes are acceptable. Together they make autonomous financial agents safe to deploy.
 
 ---
 
@@ -207,6 +272,7 @@ See [examples/03-metamask-delegated-execution.md](examples/03-metamask-delegated
 | [03-metamask-delegated-execution.md](examples/03-metamask-delegated-execution.md) | Delegated agent + outcome enforcement combined |
 | [04-uniswap-protected-swap.md](examples/04-uniswap-protected-swap.md) | Protocol-specific: Uniswap swap with net balance enforcement |
 | [05-blocked-token-drain.md](examples/05-blocked-token-drain.md) | Non-swap: protected assets must not move, regardless of calldata |
+| [06-agent-pays-for-protection.md](examples/06-agent-pays-for-protection.md) | Agent-to-agent service flow — autonomous execution with x402 payment framing |
 
 IntentGuard is not limited to swaps. The same enforcement primitive prevents unauthorized asset movement — whether from MEV, unexpected contract behavior, or malicious calldata — by enforcing that protected balances must not decrease.
 
