@@ -323,3 +323,9 @@ See [SKILL.md](./SKILL.md) for the full orchestration flow, tool reference, and 
 Built by Jean-Loïc Mugnier
 Founder, IntentGuard
 X: [@theFrBrGuy](https://x.com/theFrBrGuy)
+
+**Demo:** [https://youtu.be/t8k_bDkaRd8](https://youtu.be/t8k_bDkaRd8)
+
+**Repos:**
+- Skills: [github.com/IntentGuardLabs/intentguard-agent](https://github.com/IntentGuardLabs/intentguard-agent)
+- MCP server: [github.com/IntentGuardLabs/mcp-server](https://github.com/IntentGuardLabs/mcp-server)
